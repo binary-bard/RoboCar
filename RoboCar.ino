@@ -17,7 +17,9 @@
 const uint8_t distSensor = PB0;
 // stopSenseValue is the analog value on pin and not real distance
 // Corresponds to about 3ft and higher values mean closer
-const uint16_t stopSenseValue = 1000;
+const uint16_t stopSenseValue = 2000;
+uint16_t aveDSValue = 0;
+const uint8_t nDSSamples = 8;
 const uint8_t ledPin = PC13;
 
 const uint8_t flPlus = PA2, flNeg = PA3, flPWM  = PB7;
@@ -26,10 +28,14 @@ const uint8_t frPlus = PA4, frNeg = PA5, frPWM = PB8;
 const uint8_t rrPlus = PA6, rrNeg = PA7, rrPWM = PB9;
 
 const int testInterval = 4000;
+const int printInterval = 1000;
 int8_t i, n = 8;
 uint8_t delta = 128 / n;
 
-const unsigned long startTime = millis();
+// We don't need to hold a lot of entries
+const uint8_t BUF_LENGTH = 32;
+char lineBuf[BUF_LENGTH];
+unsigned long startTime, lastPrintTime;
 
 L298MotorControl flMC, frMC, rlMC, rrMC;
 FourWheelDrive myCar;
@@ -38,14 +44,15 @@ void blinkLed(uint8_t count)
 {
   for (uint8_t i = 0; i < count; ++i) {
     digitalWrite(ledPin, HIGH);
-    delay(200);
+    delay(30);
     digitalWrite(ledPin, LOW);
-    delay(200);
+    delay(30);
   }
 }
 
 void setup()
 {
+  // We will use serial to communicate with Raspberry Pi
   Serial.begin(115200);
   pinMode(ledPin, OUTPUT);
   flMC.setup(flPlus, flNeg, flPWM);
@@ -55,34 +62,73 @@ void setup()
   myCar.setup(flMC, frMC, rlMC, rrMC);
   blinkLed(4);
   i = n;
+  startTime = millis();
+  lastPrintTime = millis();
 }
 
 void loop()
 {
+  // Assumption: We can read and process faster than the data arrives on the link
+  // Format is TH = val or ST = val
+  uint8_t nLines = 0;
+  while (Serial.available() > 0 && nLines < 4) {
+    // read the incoming values for steering and throttle
+    uint8_t n = Serial.readBytesUntil('=', lineBuf, BUF_LENGTH - 1);
+    bool isThrottle = false;
+    bool isSteering = false;
+    for (uint8_t i = 0; i < n - 1; ++i) {
+      // Check signature whether it is throttle or steering
+      char c1 = lineBuf[i];
+      char c2 = lineBuf[i + 1];
+      if (c1 == 't' || c1 == 'T') {
+        isThrottle = (c2 == 'h' || c2 == 'H');
+      } else if (c1 == 's' || c1 == 'S') {
+        isSteering = (c2 == 't' || c2 == 'T');
+      }
+    }
+    n = Serial.readBytesUntil('\n', lineBuf, BUF_LENGTH - 1);
+    if (n > 0) {
+      int val = atoi(lineBuf);
+      if (isThrottle)
+        myCar.setThrottle(val);
+      else if (isSteering)
+        myCar.setSteering(val);
+    }
+    ++nLines;
+    if(nLines > 3)
+      Serial.println("Inputs are coming fast");
+  }
+
   // STM32F103C has 12bit ADC so range is upto 4096
   uint16_t dsRead = analogRead(distSensor);
-  Serial.print("Sensor value = ");
-  Serial.println(dsRead);
+  // Keep running mean without keeping as many entries 
+  aveDSValue = (dsRead + (nDSSamples - 1)*aveDSValue)/nDSSamples;
+  if(millis() - lastPrintTime > printInterval) {
+    Serial.print("DS = ");
+    Serial.println(aveDSValue);
+    lastPrintTime = millis();
+  }
   // dsRead is sensor Value but not distance
-  if (dsRead > stopSenseValue) {
+  if (aveDSValue > stopSenseValue) {
     // We are pretty close to obstruction, stop all motors
     myCar.brake();
-    Serial.println("Stopped");
     blinkLed(5);
   } else {
-    // Move forward for test interval, at 1/3 throttle increments
-    ++i;
-    Serial.print("Throttle is delta * ");
-    Serial.println(i);
-    if (i > n || (i == n && (128 % n == 0)))
-      i = -n;
-    if(i < 0)
-      blinkLed(-i);
-    else if(i > 0)
-      blinkLed(i);
-    Serial.print("Throttle is ");
-    Serial.println(i * delta);
-    myCar.setThrottle(i * delta);
-    delay(testInterval);
+    // Change throttle after test interval
+    if (millis() - startTime >= testInterval) {
+      ++i;
+      Serial.print("Throttle is delta * ");
+      Serial.println(i);
+      if (i > n || (i == n && (128 % n == 0)))
+        i = -n;
+      if (i < 0)
+        blinkLed(-i);
+      else if (i > 0)
+        blinkLed(i);
+      Serial.print("Throttle is ");
+      Serial.println(i * delta);
+      myCar.setThrottle(i * delta);
+      startTime = millis();
+    }
   }
 }
