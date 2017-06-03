@@ -17,9 +17,9 @@
 const uint8_t distSensor = PB0;
 // stopSenseValue is the analog value on pin and not real distance
 // Corresponds to about 3ft and higher values mean closer
-const uint16_t stopSenseValue = 2000;
+const uint16_t stopSenseValue = 1000;
 uint16_t aveDSValue = 0;
-const uint8_t nDSSamples = 8;
+const uint8_t nDSSamples = 16;
 const uint8_t ledPin = PC13;
 
 const uint8_t flPlus = PA2, flNeg = PA3, flPWM  = PB7;
@@ -28,26 +28,78 @@ const uint8_t frPlus = PA4, frNeg = PA5, frPWM = PB8;
 const uint8_t rrPlus = PA6, rrNeg = PA7, rrPWM = PB9;
 
 const int testInterval = 4000;
-const int printInterval = 1000;
-int8_t i, n = 8;
-uint8_t delta = 128 / n;
+const int printInterval = 2000;
+const int blinkInterval = 200;
+
+int8_t iStep, nSteps = 16;
+uint8_t stepDelta = 128 / nSteps;
+
+int nLoops = 0;
 
 // We don't need to hold a lot of entries
 const uint8_t BUF_LENGTH = 32;
 char lineBuf[BUF_LENGTH];
-unsigned long startTime, lastPrintTime;
+
+int8_t curThrottle = 0;
+int8_t curSteering = 0;
+
+unsigned long startTime, lastPrintTime, lastBlinkTime;
 
 L298MotorControl flMC, frMC, rlMC, rrMC;
 FourWheelDrive myCar;
 
+uint8_t blinkCount = 0;
 void blinkLed(uint8_t count)
 {
-  for (uint8_t i = 0; i < count; ++i) {
-    digitalWrite(ledPin, HIGH);
-    delay(30);
-    digitalWrite(ledPin, LOW);
-    delay(30);
+  // Set count
+  blinkCount = count;
+  lastBlinkTime = millis();
+}
+
+void doBlinkLed()
+{
+  static bool lastBlinkVal = LOW;
+  if (blinkCount && millis() - lastBlinkTime > blinkInterval) {
+    lastBlinkVal = !lastBlinkVal; // toggle
+    digitalWrite(ledPin, lastBlinkVal);
+    lastBlinkTime = millis();
+    if (lastBlinkVal == LOW)
+      --blinkCount;
   }
+}
+
+void testThrottle() {
+  if (millis() - startTime >= testInterval) {
+    ++iStep;
+    if (iStep > nSteps || (iStep == nSteps && (128 % nSteps == 0)))
+      iStep = -nSteps;
+    if (iStep < 0)
+      blinkLed(-iStep);
+    else if (iStep > 0)
+      blinkLed(iStep);
+    Serial.print("Throttle is ");
+    Serial.println(iStep * stepDelta);
+    myCar.setThrottle(iStep * stepDelta);
+    startTime = millis();
+  }
+}
+
+void printStatus() {
+  Serial.print("nLoops in ");
+  Serial.print(printInterval / 1000);
+  Serial.print("s = ");
+  Serial.print(nLoops);
+  Serial.print(", DS=");
+  Serial.println(aveDSValue);
+
+  Serial.print("TH=");
+  Serial.print(myCar.throttle());
+  Serial.print(", ST=");
+  Serial.println(myCar.steering());
+  myCar.printMotorSpeeds(Serial);
+
+  lastPrintTime = millis();
+  nLoops = 0;
 }
 
 void setup()
@@ -61,13 +113,25 @@ void setup()
   rrMC.setup(rrPlus, rrNeg, rrPWM);
   myCar.setup(flMC, frMC, rlMC, rrMC);
   blinkLed(4);
-  i = n;
-  startTime = millis();
-  lastPrintTime = millis();
+  while (blinkCount)
+    doBlinkLed();
+  iStep = nSteps;
+  lastBlinkTime = lastPrintTime = startTime = millis();
+  myCar.setThrottle(0);
+  printStatus();
 }
 
 void loop()
 {
+  bool showStatus = false;
+  ++nLoops;
+  doBlinkLed();
+  // STM32F103C has 12bit ADC so range is upto 4096
+  uint16_t dsRead = analogRead(distSensor);
+  // Keep running mean without keeping as many entries
+  aveDSValue = (dsRead + (nDSSamples - 1) * aveDSValue) / nDSSamples;
+  showStatus = millis() - lastPrintTime > printInterval;
+
   // Assumption: We can read and process faster than the data arrives on the link
   // Format is TH = val or ST = val
   uint8_t nLines = 0;
@@ -88,47 +152,29 @@ void loop()
     }
     n = Serial.readBytesUntil('\n', lineBuf, BUF_LENGTH - 1);
     if (n > 0) {
+      lineBuf[n] = 0;
       int val = atoi(lineBuf);
-      if (isThrottle)
-        myCar.setThrottle(val);
-      else if (isSteering)
-        myCar.setSteering(val);
+      showStatus = true;
+      if (isThrottle) {
+        curThrottle = val;
+      } else if (isSteering) {
+        curSteering = val;
+      }
     }
     ++nLines;
-    if(nLines > 3)
-      Serial.println("Inputs are coming fast");
+    if (nLines > 3)
+      Serial.println("Inputs too fast");
   }
 
-  // STM32F103C has 12bit ADC so range is upto 4096
-  uint16_t dsRead = analogRead(distSensor);
-  // Keep running mean without keeping as many entries 
-  aveDSValue = (dsRead + (nDSSamples - 1)*aveDSValue)/nDSSamples;
-  if(millis() - lastPrintTime > printInterval) {
-    Serial.print("DS = ");
-    Serial.println(aveDSValue);
-    lastPrintTime = millis();
-  }
   // dsRead is sensor Value but not distance
   if (aveDSValue > stopSenseValue) {
     // We are pretty close to obstruction, stop all motors
     myCar.brake();
     blinkLed(5);
   } else {
-    // Change throttle after test interval
-    if (millis() - startTime >= testInterval) {
-      ++i;
-      Serial.print("Throttle is delta * ");
-      Serial.println(i);
-      if (i > n || (i == n && (128 % n == 0)))
-        i = -n;
-      if (i < 0)
-        blinkLed(-i);
-      else if (i > 0)
-        blinkLed(i);
-      Serial.print("Throttle is ");
-      Serial.println(i * delta);
-      myCar.setThrottle(i * delta);
-      startTime = millis();
-    }
+    myCar.setThrottle(curThrottle);
+    myCar.setSteering(curSteering);
   }
+  if (showStatus)
+    printStatus();
 }

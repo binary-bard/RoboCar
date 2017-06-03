@@ -23,6 +23,48 @@ class FourWheelDrive
     int8_t _curThrottle, _curSteering;
     //static int8_t _deadZone = 32;
 
+    // Throttle is set between -128 to 127
+    void _setMotorThrottles()
+    {
+      const int8_t MaxThrottle = 127;
+      int leftTh = _curThrottle + _curSteering / 3;
+      int rightTh = _curThrottle - _curSteering / 3;
+      if (_curSteering < 0)
+        rightTh -= _curSteering / 3;
+      else
+        leftTh += _curSteering / 3;
+
+      // We need to bound the throttles of 2 sides carefully
+      if (leftTh > MaxThrottle) {
+        // left side is at full throttle ==> implies a right turn
+        rightTh -= leftTh - MaxThrottle; // We must adjust the difference to right side
+        if (rightTh < -MaxThrottle)
+          rightTh = -MaxThrottle;
+        leftTh = MaxThrottle;
+      } else if (leftTh < -MaxThrottle) {
+        // left side is at full reverse throttle ==> implies a left turn
+        // This should be a rare condition
+        rightTh += -MaxThrottle - leftTh; // Increase the right throttle
+        if (rightTh > MaxThrottle)
+          rightTh = MaxThrottle;
+        leftTh = -MaxThrottle;
+      } else if (rightTh > MaxThrottle) {
+        leftTh -= rightTh - MaxThrottle;
+        if (leftTh < -MaxThrottle)
+          leftTh = -MaxThrottle;
+        rightTh = MaxThrottle;
+      } else if (rightTh < -MaxThrottle) {
+        leftTh += -MaxThrottle - rightTh;
+        if (leftTh > MaxThrottle)
+          leftTh = MaxThrottle;
+        rightTh = -MaxThrottle;
+      }
+      _frontLeft->setSpeed(leftTh);
+      _frontRight->setSpeed(rightTh);
+      _rearLeft->setSpeed(leftTh);
+      _rearRight->setSpeed(rightTh);
+    }
+
   public:
     FourWheelDrive() : _frontLeft(0), _frontRight(0), _rearLeft(0)
       , _rearRight(0) , _curThrottle(0) {}
@@ -44,23 +86,24 @@ class FourWheelDrive
     // Throttle is set between -128 to 127
     void setThrottle(int8_t throttle)
     {
-      _frontLeft->setSpeed(throttle);
-      _frontRight->setSpeed(throttle);
-      _rearLeft->setSpeed(throttle);
-      _rearRight->setSpeed(throttle);
       _curThrottle = throttle;
+      _setMotorThrottles();
       // don't change steering
     }
 
     // Steering is set between -128 to 127
     void setSteering(int8_t steering)
     {
-      // Don't change throttle
+      // Don't change throttle but limit steering to throttle value
+      int8_t stLimit = abs(_curThrottle);
+      if (abs(steering) > stLimit) {
+        if (steering < 0)
+          steering = -stLimit;
+        else
+          steering = stLimit;
+      }
       _curSteering = steering;
-      _frontLeft->adjust(-steering / 2);
-      _frontRight->adjust(steering / 2);
-      _rearLeft->adjust(-steering / 2);
-      _rearRight->adjust(steering / 2);
+      _setMotorThrottles();
     }
 
     // To brake, we just change the direction, speed stays same
@@ -70,8 +113,8 @@ class FourWheelDrive
       _frontRight->brake();
       _rearLeft->brake();
       _rearRight->brake();
-      _curThrottle = 0;
-      _curSteering = 0;
+      //_curThrottle = 0;
+      //_curSteering = 0;
     }
 
     uint8_t throttle()
@@ -82,6 +125,18 @@ class FourWheelDrive
     uint8_t steering()
     {
       return _curSteering;
+    }
+
+    void printMotorSpeeds(Stream& st)
+    {
+      st.print("FL=");
+      st.print(_frontLeft->speed());
+      st.print(", FR=");
+      st.print(_frontRight->speed());
+      st.print(", RL=");
+      st.print(_rearLeft->speed());
+      st.print(", RR=");
+      st.println(_rearRight->speed());
     }
 
     void testControls()
