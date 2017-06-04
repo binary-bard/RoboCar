@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
-
-'''
+/*
 MIT License
 
 Copyright (c) 2017 - Ajay Guleria
@@ -22,33 +20,28 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-'''
+*/
 
-import serial
-from threading import Thread
-from time import sleep
+/* This class manages interrupt handling. Idea is to free programmer from having
+   to think about interrupt handling. Whenever a hardware interrupt occurs, some
+   flags will be set for later processing. When user registers an interrupt, user
+   also provides a routine that will service it. However, the routine doesn't get
+   serviced until the code is back out of ISR. Outside the ISR, a global function
+   is provided that will service all the pending interrupts. This function can then
+   be used inside each loop so the interrupts don't have to wait for processing
+   after code is back to main loop.
+*/
 
-ser = serial.Serial('/dev/ttyACM0',115200)
-inputAvailable = False
-entry = ""
+// Provide ISR condition and function
+class ISRHandler {
 
-def output_function():
-  while True:
-    read_serial=ser.readline()
-    print(read_serial)
-    sleep(.02)
+public:
+    Status registerISR(condition / pin, functionPtr);
+    Status unregisterISR(pin);
 
-thread = Thread(target = output_function)
-thread.start()
-try:
-  while True:
-    entry = input("Print value to send: ");
-    if len(entry):
-      ser.write(entry.encode())
-      entry = ""
+    // Function to use for processing ISRs in the loop. It will always return true but will
+    // take time to process ISRs
+    static bool processISRs();
+}
 
-  thread.join()
-except KeyboardInterrupt:
-  pass
 
-print('Done')
