@@ -15,7 +15,7 @@
 // Results of throttle testing:
 // Dead zone 0 - 32
 
-// We have 4 wheel drive
+// We have 4 wheel drive but front wheels can turn at an angle
 class FourWheelDrive
 {
     L298MotorControl *_frontLeft, *_frontRight, *_rearLeft, *_rearRight;
@@ -59,9 +59,21 @@ class FourWheelDrive
           leftTh = MaxThrottle;
         rightTh = -MaxThrottle;
       }
+      // Change speed in n intervals
+      for (uint8_t i = 1; i < 4; ++i) {
+        int8_t sp = _frontLeft->speed();
+        _frontLeft->setSpeed(sp + i * (leftTh - sp) / 4);
+        sp = _rearLeft->speed();
+        _rearLeft->setSpeed(sp + i * (leftTh - sp) / 4);
+        sp = _frontRight->speed();
+        _frontRight->setSpeed(sp + i * (rightTh - sp) / 4);
+        sp = _rearRight->speed();
+        _rearRight->setSpeed(sp + i * (rightTh - sp) / 4);
+        delay(1);
+      }
       _frontLeft->setSpeed(leftTh);
-      _frontRight->setSpeed(rightTh);
       _rearLeft->setSpeed(leftTh);
+      _frontRight->setSpeed(rightTh);
       _rearRight->setSpeed(rightTh);
     }
 
@@ -81,6 +93,28 @@ class FourWheelDrive
       _rearRight = &rr;
       _curThrottle = 0;
       _curSteering = 0;
+    }
+
+    // Throttle is set between -128 to 127
+    void setLeftThrottle(int8_t throttle)
+    {
+      // Set left throttles
+      _frontLeft->setSpeed(throttle);
+      _rearLeft->setSpeed(throttle);
+      // What is our steering and throttle?
+      _curThrottle = (throttle + _frontRight->speed()) / 2;
+      _curSteering = (throttle - _frontRight->speed()) / 2;
+    }
+
+    // Throttle is set between -128 to 127
+    void setRightThrottle(int8_t throttle)
+    {
+      // Set left throttles
+      _frontRight->setSpeed(throttle);
+      _rearRight->setSpeed(throttle);
+      // What is our steering and throttle?
+      _curThrottle = (_frontLeft->speed() + throttle) / 2;
+      _curSteering = (_frontLeft->speed() - throttle) / 2;
     }
 
     // Throttle is set between -128 to 127
@@ -113,8 +147,8 @@ class FourWheelDrive
       _frontRight->brake();
       _rearLeft->brake();
       _rearRight->brake();
-      //_curThrottle = 0;
-      //_curSteering = 0;
+      _curThrottle = 0;
+      _curSteering = 0;
     }
 
     uint8_t throttle()
