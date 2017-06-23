@@ -1,4 +1,4 @@
-# Place for scripts used in processing data for a robo car #
+### Scripts used in processing data for a robo car
 
 * **capture_videos.sh** - This script runs on the RPi. Use it to capture videos with different positions and angles
 * **video2images.sh** - convert videos to image of required sizes
