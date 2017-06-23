@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #This script will capture the videos 
-if [ $# -lt 1 ] ; then
-  echo "Usage: $0 saveDir [width [height]]"
+if [ $# -lt 1 ] || [ $# -eq 2 ]  || [ $# -gt 3 ]; then
+  echo "Usage: $0 saveDir [width=640 height=480]"
   exit 1
 fi
 
