@@ -27,28 +27,80 @@ SOFTWARE.
 import serial
 from threading import Thread
 from time import sleep
+import argparse, logging
 
-ser = serial.Serial('/dev/ttyACM0',115200)
+parser = argparse.ArgumentParser()
+parser.add_argument('-d', '--device', default='/dev/serial0', help="Device to use for serial connection")
+parser.add_argument('-l', '--logfile', default=None, help="Log file to use")
+args = parser.parse_args()
+
+try:
+  ser = serial.Serial(args.device, 115200)
+except:
+  print("Failed to open serial port", args.device)
+  quit()
+
+if args.logfile is not None:
+  logging.basicConfig(filename=args.logfile, level=logging.DEBUG)
+  #logging.basicConfig(filename=args.logfile, level=logging.DEBUG, format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
+  logging.Formatter(fmt='%(asctime)s.%(msecs)03d %(message)s', datefmt='%H:%M:%S')
+
+if ser.is_open:
+  print(ser.name, "opened")
+
+sleep(2)
+ser.flushInput()
 inputAvailable = False
 entry = ""
+bCont = True
+
+def run_test():
+  ser.write('m=1\n'.encode())
+  for s in [0, 1000, 1600, 1200, 1700, 1300, 1800, 1400, 1900, 0]:
+    sstr = 's=' + str(s) + '\n'
+    for t in [0, 1200, 0, 1200, 1600, 0, 1700, 1800, 1300, 0, 1300, 0]:
+      tstr = 't=' + str(t) + '\n'
+      ser.write(sstr.encode())
+      ser.write(tstr.encode())
+      #Arduino should continue to send out these pulses
+      sleep(1)
+ 
 
 def output_function():
-  while True:
-    read_serial=ser.readline()
-    print(read_serial)
-    sleep(.02)
+  global bCont
+  while bCont:
+    try:
+      read_serial=ser.readline()
+      if len(read_serial):
+        if args.logfile is not None:
+          logging.info(read_serial)
+        else:
+          print(read_serial)
+
+      #sleep(.02)
+    except serial.SerialException:
+      print("Exception happened")
+      pass
+    except KeyboardInterrupt:
+      bCont = False
 
 thread = Thread(target = output_function)
 thread.start()
-try:
-  while True:
+while bCont:
+  try:
     entry = input("Print value to send: ");
     if len(entry):
-      ser.write(entry.encode())
+      if entry == 'test':
+        run_test()
+      else:
+        ser.write(entry.encode())
       entry = ""
 
-  thread.join()
-except KeyboardInterrupt:
-  pass
+  except KeyboardInterrupt:
+    bCont = False
+    ser.write('t=0'.encode())
+    ser.write('s=0'.encode())
 
+thread.join()
+ser.close()
 print('Done')
