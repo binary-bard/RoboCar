@@ -44,6 +44,7 @@ byte THROTTLE_INPIN = A5;
 byte STEERING_INPIN = A4;
 byte THROTTLE_OUTPIN = 9;
 byte STEERING_OUTPIN = 11;
+byte MODE_PIN = 7;
 byte LED_PIN = 13;
 
 const int ST_ZERO = 1465; // Somewhere around this range
@@ -53,8 +54,8 @@ const int TH_MAX = 2100;
 const int ST_MIN = 1000;
 const int TH_MIN = 900;
 const int TH_SLOW_ZONE = 120;
-const int TH_ZERO_ZONE = 40;
-const float scale = 1.5;
+const int TH_ZERO_ZONE = 30;
+const float scale = 1.0;
 
 // Let's use 10 pulses to do PWM, this typically gives a cycle time over 200ms considering
 // 1 drive pulse as 20ms. We can decide which pulse goes high or low
@@ -64,8 +65,8 @@ Servo throttle, steering;
 
 /* Mode for our Arduino
     0 - Pass throttle and steering values from remote to the car and Pi
-    2 - Pass steering values only from remote to the car, good for manual pushing
     1 - Pass throttle and steering values from Pi to the car, ignore remote
+    2 - Pass steering values only from remote to the car, good for manual pushing
     3 - Pass steering values only from Pi to the car, pass throttle from remote - good for testing
 */
 int iMode = 3;
@@ -270,6 +271,7 @@ void setup() {
   Serial.println("Ready");
   pinMode(THROTTLE_INPIN, INPUT);
   pinMode(STEERING_INPIN, INPUT);
+  pinMode(MODE_PIN, INPUT);
 
   throttle.attach(THROTTLE_OUTPIN, TH_MIN, TH_MAX);
   steering.attach(STEERING_OUTPIN, ST_MIN, ST_MAX);

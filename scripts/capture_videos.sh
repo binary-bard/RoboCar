@@ -30,6 +30,8 @@ for cam_pos in center left30 right30 ; do
     saveDir="$1/$cam_pos/$pos"
     echo $saveDir
     mkdir -p $saveDir
+	#Start recording sensor data
+
     raspivid -t 0 -w $width -h $height -o $saveDir/$(date +"%Y_%m_%d_%I_%M_%p").h264
   done
 done
