@@ -35,8 +35,8 @@ def output_function():
       if len(read_serial):
         if args.logfile is not None:
           logging.info(read_serial)
-        #else:
-        print(read_serial)
+        else:
+          print(read_serial)
 
       #sleep(.02)
     except serial.SerialException:
