@@ -24,10 +24,17 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-import serial
+import serial, re
 from threading import Thread
 from time import sleep
 import argparse, logging
+import RPi.GPIO as GPIO
+
+STEERING_PIN=23
+THROTTLE_PIN=24
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(STEERING_PIN, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(THROTTLE_PIN, GPIO.OUT, initial=GPIO.LOW)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--device', default='/dev/serial0', help="Device to use for serial connection")
@@ -66,6 +73,18 @@ def run_test():
       sleep(1)
  
 
+def set_mode(mode):
+  st_val = mode & 1
+  th_val = mode & 2
+  if st_val:
+    GPIO.output(STEERING_PIN, GPIO.HIGH)
+  else:
+    GPIO.output(STEERING_PIN, GPIO.LOW)
+  if th_val:
+    GPIO.output(THROTTLE_PIN, GPIO.HIGH)
+  else:
+    GPIO.output(THROTTLE_PIN, GPIO.LOW)
+
 def output_function():
   global bCont
   while bCont:
@@ -86,21 +105,27 @@ def output_function():
 
 thread = Thread(target = output_function)
 thread.start()
+pat = re.compile('^\s*m\s*=\s*(\d+)\s*$', re.IGNORECASE)
 while bCont:
   try:
     entry = input("Print value to send: ");
     if len(entry):
+      val = pat.match(entry)
       if entry == 'test':
         run_test()
+      elif val is not None:
+        set_mode(int(val.group(1)))
       else:
         ser.write(entry.encode())
       entry = ""
 
   except KeyboardInterrupt:
     bCont = False
+    set_mode(0)
     ser.write('t=0'.encode())
     ser.write('s=0'.encode())
 
+GPIO.cleanup([STEERING_PIN, THROTTLE_PIN])
 thread.join()
 ser.close()
 print('Done')
