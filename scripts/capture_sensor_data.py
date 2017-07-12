@@ -4,6 +4,7 @@ import serial
 from threading import Thread
 from time import sleep
 import argparse, logging, subprocess
+import arduino_mode
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--device', default='/dev/serial0', help="Device to use for serial connection")
@@ -13,18 +14,17 @@ args = parser.parse_args()
 
 try:
   ser = serial.Serial(args.device, 115200)
+  sleep(1)
+  ser.flushInput()
 except:
   print("Failed to open serial port", args.device)
   quit()
 
 if args.logfile is not None:
-  logging.basicConfig(filename=args.logfile, level=logging.DEBUG)
-  #logging.basicConfig(filename=args.logfile, level=logging.DEBUG, format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
-  logging.Formatter(fmt='%(asctime)s.%(msecs)03d %(message)s', datefmt='%H:%M:%S')
+  logging.basicConfig(filename=args.logfile, level=logging.DEBUG,
+                      format='%(relativeCreated)d %(message)s')
+  #logging.Formatter(fmt='%(asctime)s.%(msecs)03d %(message)s', datefmt='%H:%M:%S')
 
-sleep(1)
-ser.flushInput()
-inputAvailable = False
 bCont = True
 
 def output_function():
@@ -53,8 +53,9 @@ thread.start()
 #3 - Pass steering values only from Pi to the car, pass throttle from remote - good for testing
 
 # Set to training mode
-ser.write('m=2'.encode())
-ser.flush()
+#ser.write('m=2'.encode())
+#ser.flush()
+arduino_mode.set_mode(0)
 
 #Run script to capture videos
 try:
@@ -63,7 +64,8 @@ except KeyboardInterrupt:
   pass
 
 bCont = False
-#print("subprocess quit")
-#thread.join()
+# Wait for the other thread to finish
+thread.join()
+logging.shutdown()
 ser.close()
 

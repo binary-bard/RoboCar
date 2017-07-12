@@ -29,12 +29,7 @@ from threading import Thread
 from time import sleep
 import argparse, logging
 import RPi.GPIO as GPIO
-
-STEERING_PIN=23
-THROTTLE_PIN=24
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(STEERING_PIN, GPIO.OUT, initial=GPIO.LOW)
-GPIO.setup(THROTTLE_PIN, GPIO.OUT, initial=GPIO.LOW)
+import arduino_mode
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-d', '--device', default='/dev/serial0', help="Device to use for serial connection")
@@ -43,6 +38,9 @@ args = parser.parse_args()
 
 try:
   ser = serial.Serial(args.device, 115200)
+  sleep(1)
+  ser.flushInput()
+  #print(ser.name, "opened")
 except:
   print("Failed to open serial port", args.device)
   quit()
@@ -52,17 +50,12 @@ if args.logfile is not None:
   #logging.basicConfig(filename=args.logfile, level=logging.DEBUG, format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p')
   logging.Formatter(fmt='%(asctime)s.%(msecs)03d %(message)s', datefmt='%H:%M:%S')
 
-if ser.is_open:
-  print(ser.name, "opened")
-
-sleep(2)
-ser.flushInput()
 inputAvailable = False
 entry = ""
 bCont = True
 
 def run_test():
-  ser.write('m=1\n'.encode())
+  arduino_mode.set_mode(3)
   for s in [0, 1000, 1600, 1200, 1700, 1300, 1800, 1400, 1900, 0]:
     sstr = 's=' + str(s) + '\n'
     for t in [0, 1200, 0, 1200, 1600, 0, 1700, 1800, 1300, 0, 1300, 0]:
@@ -71,19 +64,6 @@ def run_test():
       ser.write(tstr.encode())
       #Arduino should continue to send out these pulses
       sleep(1)
- 
-
-def set_mode(mode):
-  st_val = mode & 1
-  th_val = mode & 2
-  if st_val:
-    GPIO.output(STEERING_PIN, GPIO.HIGH)
-  else:
-    GPIO.output(STEERING_PIN, GPIO.LOW)
-  if th_val:
-    GPIO.output(THROTTLE_PIN, GPIO.HIGH)
-  else:
-    GPIO.output(THROTTLE_PIN, GPIO.LOW)
 
 def output_function():
   global bCont
@@ -114,16 +94,17 @@ while bCont:
       if entry == 'test':
         run_test()
       elif val is not None:
-        set_mode(int(val.group(1)))
+        arduino_mode.set_mode(int(val.group(1)))
       else:
         ser.write(entry.encode())
       entry = ""
 
   except KeyboardInterrupt:
     bCont = False
-    set_mode(0)
+    arduino_mode.set_mode(3)
     ser.write('t=0'.encode())
     ser.write('s=0'.encode())
+    arduino_mode.set_mode(0)
 
 GPIO.cleanup([STEERING_PIN, THROTTLE_PIN])
 thread.join()

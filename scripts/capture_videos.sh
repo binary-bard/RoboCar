@@ -37,7 +37,7 @@ for cam_pos in center left30 right30 ; do
     echo "Saving video to $saveDir. Press Ctrl+C to stop recoding when done"
     mkdir -p $saveDir
     #raspivid -t 0 -w $width -h $height -o $saveDir/$(date +'%Y_%m_%d_%I_%M_%p').h264
-    cmd="raspivid -t 0 -w $width -h $height -o $saveDir/$(date +'%Y_%m_%d_%I_%M_%p').h264"
+    cmd="raspivid -t 0 -fps 50 -w $width -h $height -o $saveDir/$(date +'%Y_%m_%d_%I_%M_%p').h264"
     python $rundir/capture_sensor_data.py -l $saveDir/$(date +'%Y_%m_%d_%I_%M_%p').log -r "$cmd"
   done
 done
