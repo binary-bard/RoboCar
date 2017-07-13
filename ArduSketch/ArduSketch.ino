@@ -124,7 +124,7 @@ void setThrottle(int thr)
     int highPulses = absThDiff * PWM_PULSES / TH_SLOW_ZONE;
     // since absThDiff is always less than TH_SLOW_ZONE, there is at least 1 low pulse
     int lowPulses = PWM_PULSES - highPulses;
-    if (tPulseCount == 1) {
+    if (tPulseCount == 1 && false) {
       // Print first time
       sprintf(writeBuf, "HP=%d, LP=%d\n", highPulses, lowPulses);
       Serial.println(writeBuf);
@@ -177,7 +177,7 @@ void sendValues(int thr, int str)
     lastDriveTime = millis();
   }
   // Pass these back to RPi for logging
-  if (send2Pi && millis() > lastPassTime + 20) {
+  if (send2Pi && millis() > lastPassTime + 10) {
     // Use json format
     sprintf(writeBuf, "{\"mode\": %d, \"throttle\": %d, \"steering\": %d}\n", iMode, thr, str);
     Serial.print(writeBuf);
@@ -245,7 +245,7 @@ bool checkInputLine(TokenType& tt, int& iVal)
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Ready");
+  #Serial.println("Ready");
   pinMode(THROTTLE_INPIN, INPUT);
   pinMode(STEERING_INPIN, INPUT);
   pinMode(MODE1_PIN, INPUT);
