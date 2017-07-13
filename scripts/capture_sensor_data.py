@@ -2,7 +2,7 @@
 
 import serial
 from threading import Thread
-from time import sleep
+from time import sleep, time
 import argparse, logging, subprocess
 import arduino_mode
 
@@ -21,9 +21,20 @@ except:
   quit()
 
 if args.logfile is not None:
-  logging.basicConfig(filename=args.logfile, level=logging.DEBUG,
+  logging.basicConfig(filename=args.logfile, filemode='w', level=logging.DEBUG,
                       format='%(relativeCreated)d %(message)s')
   #logging.Formatter(fmt='%(asctime)s.%(msecs)03d %(message)s', datefmt='%H:%M:%S')
+
+#0 - Pass throttle and steering values from remote to the car and Pi
+#1 - Pass throttle and steering values from Pi to the car, ignore remote
+#2 - Pass steering values only from remote to the car, good for manual pushing during training
+#3 - Pass steering values only from Pi to the car, pass throttle from remote - good for testing
+
+# Set to training mode
+#ser.write('m=2'.encode())
+#ser.flush()
+arduino_mode.set_mode(0)
+logging.info(b'{"mode":0, "throttle":0, "steering":0}\n')
 
 bCont = True
 
@@ -46,16 +57,6 @@ def output_function():
 
 thread = Thread(target = output_function)
 thread.start()
-
-#0 - Pass throttle and steering values from remote to the car and Pi
-#1 - Pass throttle and steering values from Pi to the car, ignore remote
-#2 - Pass steering values only from remote to the car, good for manual pushing during training
-#3 - Pass steering values only from Pi to the car, pass throttle from remote - good for testing
-
-# Set to training mode
-#ser.write('m=2'.encode())
-#ser.flush()
-arduino_mode.set_mode(0)
 
 #Run script to capture videos
 try:
