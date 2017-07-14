@@ -48,7 +48,7 @@ with open(args.logfile) as fl:
       logts = logDict['msSince'] - offset
     print(framets, logts)
     if(success):
-      imageFile = args.imagedir + "/im%05d_s%s_t%s.jpg" % (count, logDict["steering"], logDict["throttle"])
+      imageFile = "%s/frame_%05d_str_%s_thr_%s.jpg" % (args.imagedir, count, logDict["steering"], logDict["throttle"])
       cv2.imwrite(imageFile, image)                 # save frame as JPEG file
       count += 1
     if cv2.waitKey(10) == 27:                     # exit if Escape is hit
