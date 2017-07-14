@@ -24,7 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
 
-import argparse
+import argparse, atexit
 import RPi.GPIO as GPIO
 
 # These pin controls whether Arduino will pass steering/throttle from Pi
@@ -35,10 +35,11 @@ THROTTLE_PIN=24
 # pass 0 throttle and steering to car thus stopping it right away.
 START_PIN=25
 
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(STEERING_PIN, GPIO.OUT, initial=GPIO.LOW)
-GPIO.setup(THROTTLE_PIN, GPIO.OUT, initial=GPIO.LOW)
-GPIO.setup(START_PIN, GPIO.OUT, initial=GPIO.LOW)
+def setup_pins():
+  GPIO.setmode(GPIO.BCM)
+  GPIO.setup(STEERING_PIN, GPIO.OUT, initial=GPIO.LOW)
+  GPIO.setup(THROTTLE_PIN, GPIO.OUT, initial=GPIO.LOW)
+  GPIO.setup(START_PIN, GPIO.OUT, initial=GPIO.LOW)
 
 def set_mode(mode):
   st_val = mode & 1
@@ -53,11 +54,20 @@ def set_mode(mode):
     GPIO.output(THROTTLE_PIN, GPIO.LOW)
 
 def start_motors():
-  GPIO.output(THROTTLE_PIN, GPIO.HIGH)
+  GPIO.output(START_PIN, GPIO.HIGH)
   
 def stop_motors():
-  GPIO.output(THROTTLE_PIN, GPIO.LOW)
-  
+  GPIO.output(START_PIN, GPIO.LOW)
+
+def cleanup():
+  print("Resetting arduino mode to training and stopping motors")
+  set_mode(0)
+  stop_motors()
+  GPIO.cleanup([THROTTLE_PIN, STEERING_PIN, START_PIN])
+
+setup_pins()
+atexit.register(cleanup)
+
 if __name__ == "main":
   parser = argparse.ArgumentParser()
   parser.add_argument('mode', type=int, help="Mode to set")

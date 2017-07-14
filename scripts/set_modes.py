@@ -1,6 +1,6 @@
 from flask import Flask, flash, redirect, render_template, request, Response, session
 from subprocess import Popen, PIPE
-#from scripts import arduino_mode
+import arduino_mode
 
 app = Flask(__name__, template_folder='../templates')
 
@@ -18,7 +18,24 @@ def setModes():
     #mode = request.args.get('mode')
     mode = request.form.get('mode')
     session['mode'] = mode
-    print(mode)
+    if mode == "train":
+      arduino_mode.set_mode(0)
+    elif mode == "steer":
+      arduino_mode.set_mode(1)
+    elif mode == "test":
+      arduino_mode.set_mode(2)
+    elif mode == "run":
+      arduino_mode.set_mode(3)
+    else:
+      print('No mode set, setting it to train')
+      arduino_mode.set_mode(0)
+
+  elif(action == 'Start'):
+    arduino_mode.start_motors()
+  elif(action == 'Stop'):
+    arduino_mode.stop_motors()
+  else:
+    print('No appropriate action')
 
   return redirect('/')
   #return Response(action, mimetype='text/html')
@@ -53,5 +70,5 @@ def train():
 
 
 if __name__ == "__main__":
-  #arduino_mode.setup()
   app.run(host='0.0.0.0', port=8080)
+
