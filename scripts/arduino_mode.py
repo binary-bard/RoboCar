@@ -27,13 +27,20 @@ SOFTWARE.
 import argparse
 import RPi.GPIO as GPIO
 
+# These pin controls whether Arduino will pass steering/throttle from Pi
+# or the RC remote to the car. HIGH means it will pass Pi values
 STEERING_PIN=23
 THROTTLE_PIN=24
+# This pin controls start and stop of motors. If low, Arduino will not
+# pass 0 throttle and steering to car thus stopping it right away.
+START_PIN=25
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(STEERING_PIN, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(THROTTLE_PIN, GPIO.OUT, initial=GPIO.LOW)
+GPIO.setup(START_PIN, GPIO.OUT, initial=GPIO.LOW)
 
 def set_mode(mode):
-  GPIO.setmode(GPIO.BCM)
-  GPIO.setup(STEERING_PIN, GPIO.OUT, initial=GPIO.LOW)
-  GPIO.setup(THROTTLE_PIN, GPIO.OUT, initial=GPIO.LOW)
   st_val = mode & 1
   th_val = mode & 2
   if st_val:
@@ -45,6 +52,12 @@ def set_mode(mode):
   else:
     GPIO.output(THROTTLE_PIN, GPIO.LOW)
 
+def start_motors():
+  GPIO.output(THROTTLE_PIN, GPIO.HIGH)
+  
+def stop_motors():
+  GPIO.output(THROTTLE_PIN, GPIO.LOW)
+  
 if __name__ == "main":
   parser = argparse.ArgumentParser()
   parser.add_argument('mode', type=int, help="Mode to set")

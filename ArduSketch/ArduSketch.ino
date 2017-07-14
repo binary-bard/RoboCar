@@ -44,7 +44,7 @@ byte THROTTLE_OUTPIN = 11;
 byte LED_PIN = 13;
 
 const int ST_ZERO = 1465; // Somewhere around this range
-const int TH_ZERO = 1465; // somewhere around this range
+const int TH_ZERO = 1485; // somewhere around this range
 const int ST_MAX = 2000;
 const int TH_MAX = 2100;
 const int ST_MIN = 1000;
@@ -69,7 +69,8 @@ int iMode = 0;
 // Use these pins to control the mode
 // 0 - pass value from RC, 1 - pass value from RPi
 byte MODE1_PIN = 4; // Controls steering passthrough
-byte MODE2_PIN = 7; // Controls throttle passthrough
+byte MODE2_PIN = 5; // Controls throttle passthrough
+byte START_PIN = 7; // Arduino will no pass anything if this pin is LOW
 
 int iThrottle = TH_ZERO;
 int iSteering = ST_ZERO;
@@ -245,11 +246,12 @@ bool checkInputLine(TokenType& tt, int& iVal)
 
 void setup() {
   Serial.begin(115200);
-  #Serial.println("Ready");
+  Serial.println("Ready");
   pinMode(THROTTLE_INPIN, INPUT);
   pinMode(STEERING_INPIN, INPUT);
   pinMode(MODE1_PIN, INPUT);
   pinMode(MODE2_PIN, INPUT);
+  pinMode(START_PIN, INPUT);
 
   throttle.attach(THROTTLE_OUTPIN, TH_MIN, TH_MAX);
   steering.attach(STEERING_OUTPIN, ST_MIN, ST_MAX);
@@ -287,15 +289,24 @@ void loop() {
         break;
     }
   }
-  // see iMode comments at definition
-  sendValues(iThrottle, iSteering);
-  if (millis() - lastLedTime > 100 * (1 + iMode)) {
-    digitalWrite(LED_PIN, ledVal);
-    ledVal = !ledVal;
-    lastLedTime = millis();
-    //Serial.print("Average loops = ");
-    //Serial.println(nLoops);
-    nLoops = 0;
+  // If START_PIN is low, we want to stop motors
+  bool stopMotors = !digitalRead(START_PIN);
+  if (stopMotors) {
+    setThrottle(0);
+    setSteering(0);
+    // Indicate the stopped motors by turning on LED_PIN fully
+    digitalWrite(LED_PIN, HIGH);
+  } else {
+    // see iMode comments at definition
+    sendValues(iThrottle, iSteering);
+    if (millis() - lastLedTime > 100 * (1 + iMode)) {
+      digitalWrite(LED_PIN, ledVal);
+      ledVal = !ledVal;
+      lastLedTime = millis();
+      //Serial.print("Average loops = ");
+      //Serial.println(nLoops);
+      nLoops = 0;
+    }
   }
 }
 
