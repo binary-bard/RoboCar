@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <form action="/SetMode" method="POST">
+      <p>
+        <div class="form-group">
+          <select name="mode" class="form-control">
+            <option disabled selected> Select Mode </option>
+            <option value="train">Control both steering and throttle from RC</option>
+            <option value="steer">Control steering from RC and Throttle from RPi</option>
+            <option value="test">Control steering  from RPi and Throttle from RC</option>
+            <option value="run">Control both steering and throttle from RPi</option>
+          </select>
+          <input type="submit" name="Submit" value="Select" style="height: 1.5em; width: 5em" >
+        </div>
+      </p>
+      <p>
+        <button  type="submit" name="Submit" value="Start">Start the car</button>
+        <button  type="submit" name="Submit" value="Stop">Stop the car</button>
+      </p>
+    </form>
+  </body>
+</html>
