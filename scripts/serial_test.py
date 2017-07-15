@@ -28,7 +28,6 @@ import serial, re
 from threading import Thread
 from time import sleep
 import argparse, logging
-import RPi.GPIO as GPIO
 import arduino_mode
 
 parser = argparse.ArgumentParser()
@@ -86,6 +85,7 @@ def output_function():
 thread = Thread(target = output_function)
 thread.start()
 pat = re.compile('^\s*m\s*=\s*(\d+)\s*$', re.IGNORECASE)
+arduino_mode.start_motors()
 while bCont:
   try:
     entry = input("Print value to send: ");
@@ -101,12 +101,12 @@ while bCont:
 
   except KeyboardInterrupt:
     bCont = False
-    arduino_mode.set_mode(3)
+    #arduino_mode.set_mode(3)
     ser.write('t=0'.encode())
     ser.write('s=0'.encode())
     arduino_mode.set_mode(0)
 
-GPIO.cleanup([STEERING_PIN, THROTTLE_PIN])
+arduino_mode.stop_motors()
 thread.join()
 ser.close()
 print('Done')
