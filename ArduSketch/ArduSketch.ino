@@ -37,10 +37,10 @@ enum TokenType : uint8_t {
 };
 
 // Steering is channel 1 and throttle is channel 2
-byte STEERING_INPIN = A4;
-byte THROTTLE_INPIN = A5;
+byte STEERING_INPIN = A0;
+byte THROTTLE_INPIN = A1;
 byte STEERING_OUTPIN = 9;
-byte THROTTLE_OUTPIN = 11;
+byte THROTTLE_OUTPIN = 10;
 byte LED_PIN = 13;
 
 const int ST_ZERO = 1465; // Somewhere around this range
@@ -180,7 +180,7 @@ void sendValues(int thr, int str)
   // Pass these back to RPi for logging
   if (send2Pi && millis() > lastPassTime + 10) {
     // Use json format
-    sprintf(writeBuf, "{\"mode\": %d, \"throttle\": %d, \"steering\": %d}\n", iMode, thr, str);
+    sprintf(writeBuf, "{\"throttle\": %d, \"steering\": %d}\n", thr, str);
     Serial.print(writeBuf);
     Serial.flush();
     lastPassTime = millis();
@@ -246,12 +246,13 @@ bool checkInputLine(TokenType& tt, int& iVal)
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Ready");
   pinMode(THROTTLE_INPIN, INPUT);
   pinMode(STEERING_INPIN, INPUT);
   pinMode(MODE1_PIN, INPUT);
   pinMode(MODE2_PIN, INPUT);
   pinMode(START_PIN, INPUT);
+  // We will use it to indicate modes
+  pinMode(LED_PIN, OUTPUT);
 
   throttle.attach(THROTTLE_OUTPIN, TH_MIN, TH_MAX);
   steering.attach(STEERING_OUTPIN, ST_MIN, ST_MAX);
@@ -259,9 +260,12 @@ void setup() {
   // Write the neutral value
   throttle.writeMicroseconds(TH_ZERO);
   steering.writeMicroseconds(ST_ZERO);
-  // We will use it to indicate mode
-  pinMode(LED_PIN, OUTPUT);
   lastDriveTime = lastPassTime = lastLedTime = millis();
+  Serial.println("Ready");
+  // Initialize the values
+  sprintf(writeBuf, "{\"throttle\": %d, \"steering\": %d}\n", TH_ZERO, ST_ZERO);
+  Serial.print(writeBuf);
+  Serial.flush();
 }
 
 void loop() {
@@ -273,11 +277,9 @@ void loop() {
   if (bIn) {
     switch (tt) {
       case THROTTLE:
-        //iThrottle = TH_MIN + tokenVal*(TH_MAX - TH_MIN)/256;
         iThrottle = tokenVal;
         break;
       case STEERING:
-        //iSteering =  ST_MIN + tokenVal*(ST_MAX - ST_MIN)/256;
         iSteering =  tokenVal;
         break;
       case VALERROR:
@@ -303,8 +305,6 @@ void loop() {
       digitalWrite(LED_PIN, ledVal);
       ledVal = !ledVal;
       lastLedTime = millis();
-      //Serial.print("Average loops = ");
-      //Serial.println(nLoops);
       nLoops = 0;
     }
   }
